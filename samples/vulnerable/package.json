@@ -1,0 +1,9 @@
+{
+  "name": "react2shell-vulnerable-fixture",
+  "version": "1.0.0",
+  "dependencies": {
+    "next": "14.2.10",
+    "react": "19.0.0-rc",
+    "react-server-dom-webpack": "19.0.0-rc"
+  }
+}

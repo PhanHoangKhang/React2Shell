@@ -1,0 +1,10 @@
+{
+  "name": "react2shell-patched-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "next": "15.2.3",
+    "react": "19.2.4",
+    "react-server-dom-webpack": "19.2.4"
+  }
+}
