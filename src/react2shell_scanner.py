@@ -1,161 +1,214 @@
-#!/usr/bin/env python3
-import json
-import os
-import sys
 import argparse
-from typing import Dict, List, Any
-from packaging.version import parse as parse_version, InvalidVersion
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Dict, List, Any, Tuple, Optional
 
-# Định nghĩa các dải phiên bản bị ảnh hưởng dựa trên CVE-2025-55182 & CVE-2025-66478[cite: 1]
+# Unified CVE for the React2Shell vulnerability
+CVE_ID = "CVE-2025-55182"
+
+# Affected version ranges based on official advisories
 VULNERABILITY_RULES = {
     "react": [
-        {"min": "19.0.0-alpha", "max": "19.2.3", "fixed": "19.2.4"}
+        {"min": "19.0.0-alpha", "max": "19.0.0-rc", "fixed": "19.0.1"}
     ],
     "react-dom": [
-        {"min": "19.0.0-alpha", "max": "19.2.3", "fixed": "19.2.4"}
+        {"min": "19.0.0-alpha", "max": "19.0.0-rc", "fixed": "19.0.1"}
     ],
     "react-server-dom-webpack": [
-        {"min": "19.0.0-alpha", "max": "19.2.3", "fixed": "19.2.4"}
+        {"min": "19.0.0-alpha", "max": "19.0.0-rc", "fixed": "19.0.1"}
+    ],
+    "react-server-dom-parcel": [
+        {"min": "19.0.0-alpha", "max": "19.0.0-rc", "fixed": "19.0.1"}
+    ],
+    "react-server-dom-turbopack": [
+        {"min": "19.0.0-alpha", "max": "19.0.0-rc", "fixed": "19.0.1"}
     ],
     "next": [
         {"min": "13.0.0", "max": "14.2.14", "fixed": "14.2.15"},
-        {"min": "15.0.0", "max": "15.2.2", "fixed": "15.2.3"}
+        {"min": "15.0.0-canary.0", "max": "15.0.0-rc.0", "fixed": "15.0.1"}
     ]
 }
 
-def check_version_vulnerable(pkg_name: str, version_str: str) -> Dict[str, Any]:
-    clean_version = version_str.lstrip("^~=><")
+def parse_semver(version_str: str) -> Optional[Tuple[int, int, int, str]]:
+    """Parse version string into (major, minor, patch, prerelease)."""
+    if not isinstance(version_str, str):
+        return None
     
-    try:
-        ver = parse_version(clean_version)
-    except InvalidVersion:
+    clean_str = version_str.strip().lstrip("^~>=<v ")
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?", clean_str)
+    if not match:
+        return None
+        
+    major, minor, patch, prerelease = match.groups()
+    return (int(major), int(minor), int(patch), prerelease or "")
+
+def compare_semver(v1: Tuple[int, int, int, str], v2: Tuple[int, int, int, str]) -> int:
+    """Compare two semver tuples."""
+    if v1[:3] != v2[:3]:
+        return -1 if v1[:3] < v2[:3] else 1
+    
+    pre1, pre2 = v1[3], v2[3]
+    if not pre1 and pre2:
+        return 1
+    if pre1 and not pre2:
+        return -1
+    if pre1 == pre2:
+        return 0
+    return -1 if pre1 < pre2 else 1
+
+def check_version_status(pkg_name: str, version_str: str) -> Dict[str, Any]:
+    """Evaluate version string against security rules."""
+    parsed_target = parse_semver(version_str)
+    
+    if not parsed_target:
         return {
-            "is_vulnerable": False,
             "status": "UNKNOWN",
-            "recommendation": f"Invalid version format: {version_str}"
+            "severity": "LOW",
+            "recommendation": f"Invalid version format ({version_str}). Manual review required."
         }
 
     rules = VULNERABILITY_RULES.get(pkg_name, [])
     for rule in rules:
-        try:
-            min_ver = parse_version(rule["min"])
-            max_ver = parse_version(rule["max"])
-            
-            if min_ver <= ver <= max_ver:
+        parsed_min = parse_semver(rule["min"])
+        parsed_max = parse_semver(rule["max"])
+        
+        if parsed_min and parsed_max:
+            if compare_semver(parsed_min, parsed_target) <= 0 and compare_semver(parsed_target, parsed_max) <= 0:
                 return {
-                    "is_vulnerable": True,
                     "status": "VULNERABLE",
-                    "recommendation": f"Upgrade {pkg_name} to >= {rule['fixed']}"
+                    "severity": "CRITICAL",
+                    "recommendation": f"Upgrade {pkg_name} to >= {rule['fixed']} immediately."
                 }
-        except InvalidVersion:
-            continue
 
     return {
-        "is_vulnerable": False,
-        "status": "SAFE",
-        "recommendation": "No action required"
+        "status": "PATCHED",
+        "severity": "NONE",
+        "recommendation": "No vulnerability detected for this package."
     }
 
-def scan_package_json(filepath: str) -> List[Dict[str, Any]]:
-    results = []
-    if not os.path.isfile(filepath):
-        return results
+def load_json(path: Path) -> Dict[str, Any]:
+    """Safe load JSON file content."""
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
+def scan_project(project_dir: Path) -> List[Dict[str, Any]]:
+    """Scan package.json and package-lock.json for affected dependencies."""
+    pkg_file = project_dir / "package.json"
+    lock_file = project_dir / "package-lock.json"
 
-        dep_sections = ["dependencies", "devDependencies", "peerDependencies"]
-        for section in dep_sections:
-            deps = data.get(section, {})
-            for pkg_name, version_spec in deps.items():
-                if pkg_name in VULNERABILITY_RULES:
-                    analysis = check_version_vulnerable(pkg_name, version_spec)
-                    results.append({
-                        "package": pkg_name,
-                        "detected_version": version_spec,
-                        "source_file": filepath,
-                        "status": analysis["status"],
-                        "is_vulnerable": analysis["is_vulnerable"],
-                        "recommendation": analysis.get("recommendation", "")
-                    })
-    except Exception as e:
-        print(f"[!] Error parsing {filepath}: {e}", file=sys.stderr)
+    if not pkg_file.exists():
+        raise FileNotFoundError("package.json not found in target directory.")
 
-    return results
+    pkg_data = load_json(pkg_file)
+    lock_data = load_json(lock_file) if lock_file.exists() else {}
 
-def scan_package_lock_json(filepath: str) -> List[Dict[str, Any]]:
-    results = []
-    if not os.path.isfile(filepath):
-        return results
+    # Extract declared dependencies
+    declared_deps = {}
+    for section in ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]:
+        declared_deps.update(pkg_data.get(section, {}))
 
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        packages = data.get("packages", {})
+    # Extract locked dependencies
+    locked_deps = {}
+    if lock_data:
+        packages = lock_data.get("packages", {})
         for pkg_path, details in packages.items():
-            pkg_name = details.get("name") or pkg_path.replace("node_modules/", "")
-            if pkg_name in VULNERABILITY_RULES:
-                version = details.get("version", "unknown")
-                analysis = check_version_vulnerable(pkg_name, version)
-                results.append({
-                    "package": pkg_name,
-                    "detected_version": version,
-                    "source_file": filepath,
-                    "status": analysis["status"],
-                    "is_vulnerable": analysis["is_vulnerable"],
-                    "recommendation": analysis.get("recommendation", "")
-                })
-    except Exception as e:
-        print(f"[!] Error parsing {filepath}: {e}", file=sys.stderr)
+            if not pkg_path or not isinstance(details, dict):
+                continue
+            pkg_name = details.get("name") or pkg_path.split("node_modules/")[-1]
+            version = details.get("version")
+            if pkg_name and version:
+                locked_deps[pkg_name] = version
 
-    return results
-
-def run_scanner(target_path: str) -> List[Dict[str, Any]]:
     findings = []
-    
-    # Nếu đường dẫn truyền vào là một thư mục
-    if os.path.isdir(target_path):
-        pkg_json = os.path.join(target_path, "package.json")
-        pkg_lock = os.path.join(target_path, "package-lock.json")
-        
-        findings.extend(scan_package_json(pkg_json))
-        findings.extend(scan_package_lock_json(pkg_lock))
-    
-    # Nếu đường dẫn truyền vào thẳng file .json
-    elif os.path.isfile(target_path):
-        if target_path.endswith("package-lock.json"):
-            findings.extend(scan_package_lock_json(target_path))
+    target_packages = set(VULNERABILITY_RULES.keys())
+    scanned_packages = target_packages.intersection(set(declared_deps.keys()).union(set(locked_deps.keys())))
+
+    for pkg_name in sorted(scanned_packages):
+        if pkg_name in locked_deps:
+            version = locked_deps[pkg_name]
+            source = "package-lock.json"
         else:
-            findings.extend(scan_package_json(target_path))
-            
+            version = declared_deps[pkg_name]
+            source = "package.json"
+
+        eval_result = check_version_status(pkg_name, version)
+        
+        findings.append({
+            "package": pkg_name,
+            "version": version,
+            "source": source,
+            "status": eval_result["status"],
+            "severity": eval_result["severity"],
+            "cve": CVE_ID,
+            "recommendation": eval_result["recommendation"]
+        })
+
     return findings
 
-def print_cli_report(findings: List[Dict[str, Any]]):
-    print("\n=======================================================")
-    print("      NeoReact2Shell Local Vulnerability Scanner       ")
-    print("=======================================================\n")
+def print_cli_table(findings: List[Dict[str, Any]], project_dir: Path):
+    """Print clean terminal output."""
+    print("\n" + "-" * 70)
+    print("           NEOREACT2SHELL LOCAL DEPENDENCY SCANNER")
+    print("-" * 70)
+    print(f"Target Directory : {project_dir.resolve()}")
+    print(f"Target CVE       : {CVE_ID}")
+    print(f"Total Detected   : {len(findings)} target package(s)")
+    print("-" * 70)
 
     if not findings:
-        print("[+] No target packages detected.")
+        print("[+] No React Server Components or Next.js packages detected.")
+        print("=" * 70 + "\n")
         return
 
-    vulnerable_count = 0
-    for item in findings:
-        status_symbol = "[!]" if item["is_vulnerable"] else "[+]"
-        print(f"{status_symbol} Package: {item['package']}")
-        print(f"    Version Detected : {item['detected_version']}")
-        print(f"    Source File      : {item['source_file']}")
-        print(f"    Exposure Status  : {item['status']}")
-        print(f"    Recommendation   : {item['recommendation']}")
-        print("-" * 55)
-        if item["is_vulnerable"]:
-            vulnerable_count += 1
+    vulnerable_cnt = 0
+    for idx, item in enumerate(findings, 1):
+        symbol = "[!]" if item["status"] == "VULNERABLE" else "[+]"
+        print(f"{symbol} [{idx}] Package      : {item['package']}")
+        print(f"    Version      : {item['version']}")
+        print(f"    Source       : {item['source']}")
+        print(f"    Status       : {item['status']}")
+        print(f"    Severity     : {item['severity']}")
+        print(f"    Action       : {item['recommendation']}")
+        print("-" * 70)
+        
+        if item["status"] == "VULNERABLE":
+            vulnerable_cnt += 1
 
-    print(f"\nScan Complete: {len(findings)} checked, {vulnerable_count} VULNERABLE.\n")
+    print("SCAN SUMMARY:")
+    print(f"  - Total Scanned : {len(findings)}")
+    print(f"  - Vulnerable    : {vulnerable_cnt}")
+    print(f"  - Patched/Safe  : {len(findings) - vulnerable_cnt}")
+    print("=" * 70 + "\n")
+
+def main():
+    parser = argparse.ArgumentParser(description="Local React2Shell dependency scanner")
+    parser.add_argument("project", nargs="?", default=".", help="Path to project directory (default: current dir)")
+    parser.add_argument("--json", action="store_true", help="Output results in JSON format")
+
+    args = parser.parse_args()
+    project_path = Path(args.project)
+
+    if not project_path.is_dir():
+        print(f"Error: Target path '{project_path}' is not a valid directory.", file=sys.stderr)
+        return 2
+
+    try:
+        findings = scan_project(project_path)
+    except Exception as err:
+        print(f"Error during scan: {err}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(findings, indent=2))
+    else:
+        print_cli_table(findings, project_path)
+
+    if any(f["status"] == "VULNERABLE" for f in findings):
+        return 1
+
+    return 0
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else "."
-    findings = run_scanner(target)
-    print_cli_report(findings)  
+    sys.exit(main())
