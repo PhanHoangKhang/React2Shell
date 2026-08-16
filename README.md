@@ -53,6 +53,6 @@ python src/react2shell_scanner.py lab/vulnerable
 ### Dynamic Exploitation & Validation (PoC)
 To execute the exploit validation tests and verify exfiltration artifacts, please refer to the detailed step-by-step PoC guide:
 
-[![PoC Guide](https://img.shields.io/badge/🧪_PoC-poc__reference.md-green?style=for-the-badge)](./lab/poc/poc_reference.md)
+👉 **[View PoC & Vulnerability Validation Guide (`poc_reference.md`)](./lab/poc/poc_reference.md)**
 
 
