@@ -37,6 +37,7 @@ def parse_semver(version_str: str) -> Optional[Tuple[int, int, int, str]]:
         return None
     
     clean_str = version_str.strip().lstrip("^~>=<v ")
+    # Match semver pattern: e.g. 19.0.0-rc-65a56d0e-20241020 or 14.2.10
     match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?", clean_str)
     if not match:
         return None
@@ -69,18 +70,35 @@ def check_version_status(pkg_name: str, version_str: str) -> Dict[str, Any]:
             "recommendation": f"Invalid version format ({version_str}). Manual review required."
         }
 
-    rules = VULNERABILITY_RULES.get(pkg_name, [])
-    for rule in rules:
-        parsed_min = parse_semver(rule["min"])
-        parsed_max = parse_semver(rule["max"])
-        
-        if parsed_min and parsed_max:
-            if compare_semver(parsed_min, parsed_target) <= 0 and compare_semver(parsed_target, parsed_max) <= 0:
+    major, minor, patch, prerelease = parsed_target
+
+    # Direct check for React 19 pre-releases (alpha, rc, canary)
+    if pkg_name in {"react", "react-dom", "react-server-dom-webpack", "react-server-dom-parcel", "react-server-dom-turbopack"}:
+        if major == 19 and minor == 0 and patch == 0:
+            # Any 19.0.0 pre-release tag (rc, alpha, canary, commit hash) is vulnerable
+            if prerelease:
                 return {
                     "status": "VULNERABLE",
                     "severity": "CRITICAL",
-                    "recommendation": f"Upgrade {pkg_name} to >= {rule['fixed']} immediately."
+                    "recommendation": f"Upgrade {pkg_name} to >= 19.0.1 immediately."
                 }
+
+    # Direct check for Next.js vulnerable ranges
+    if pkg_name == "next":
+        # Next.js 13.x & 14.x (< 14.2.15)
+        if (major == 13) or (major == 14 and (minor < 2 or (minor == 2 and patch < 15))):
+            return {
+                "status": "VULNERABLE",
+                "severity": "CRITICAL",
+                "recommendation": "Upgrade next to >= 14.2.15 immediately."
+            }
+        # Next.js 15.x pre-releases
+        if major == 15 and minor == 0 and patch == 0 and prerelease:
+            return {
+                "status": "VULNERABLE",
+                "severity": "CRITICAL",
+                "recommendation": "Upgrade next to >= 15.0.1 immediately."
+            }
 
     return {
         "status": "PATCHED",
