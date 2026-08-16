@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 
 # python src/react2shell_scanner.py lab/vulnerable
+# python src/react2shell_scanner.py lab/patched
 
 # Unified CVE for the React2Shell vulnerability
 CVE_ID = "CVE-2025-55182"

