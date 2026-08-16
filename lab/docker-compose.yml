@@ -1,0 +1,36 @@
+version: '3.8'
+
+# docker-compose up -d --build
+services:
+  # Container chứa ứng dụng Next.js bị lỗ hổng
+  vulnerable-app:
+    build:
+      context: ./vulnerable
+      dockerfile: Dockerfile
+    container_name: react2shell-vulnerable
+    ports:
+      - "127.0.0.1:3001:3000"
+    networks:
+      - isolated-lab
+    environment:
+      - APP_ENV=vulnerable
+    restart: unless-stopped
+
+  # Container chứa ứng dụng Next.js đã vá lỗi
+  patched-app:
+    build:
+      context: ./patched
+      dockerfile: Dockerfile
+    container_name: react2shell-patched
+    ports:
+      - "127.0.0.1:3002:3000"
+    networks:
+      - isolated-lab
+    environment:
+      - APP_ENV=patched
+    restart: unless-stopped
+  
+# Mạng Docker nội bộ cách ly
+networks:
+  isolated-lab:
+    driver: bridge
