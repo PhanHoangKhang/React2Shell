@@ -12,6 +12,7 @@ Before running validation tests, purge all lingering artifact files from both co
 
 ## Environment Setup
 ### Start the Lab Infrastructure
+Navigate to the lab/ directory and initialize both dual-build containers:
 ```bash
 cd lab
 docker-compose up -d --build

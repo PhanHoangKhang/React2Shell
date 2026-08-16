@@ -26,3 +26,33 @@ This repository provides a reproducible, dual-container Docker environment desig
 - **Docker Desktop** (Engine `24.0.0+`, Compose `v2.20.0+`)
 - **Python** (`3.8+` — Standard library only for base automation)
 - **cURL** (WSL, Linux, or PowerShell built-in)
+
+### Installation
+Clone the repository and verify your local environment:
+```bash
+git clone https://github.com/rmit-nct/React2Shell.git
+```
+### Lab Startup
+Navigate to the lab/ directory and initialize both dual-build containers:
+```bash
+cd lab
+docker-compose up -d --build
+cd ..
+```
+### Vulnerability Detection
+Run the detection scanner in both labs:
+#### 1. Scan the patched lab 
+```bash
+python src/react2shell_scanner.py lab/patched
+```
+#### 2. Scan the vulnerable lab
+```bash
+python src/react2shell_scanner.py lab/vulnerable
+```
+
+### Dynamic Exploitation & Validation (PoC)
+To execute the exploit validation tests and verify exfiltration artifacts, please refer to the detailed step-by-step PoC guide:
+
+[![PoC Guide](https://img.shields.io/badge/🧪_PoC-poc__reference.md-green?style=for-the-badge)](./lab/poc/poc_reference.md)
+
+
