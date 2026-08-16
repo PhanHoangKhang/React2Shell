@@ -10,6 +10,12 @@
 
 Before running validation tests, purge all lingering artifact files from both containers to prevent false positives/negatives during assessment.
 
+### Environment Setup
+```bash
+cd lab
+docker-compose up -d --build
+```
+
 ### Environment Cleanup
 ```bash
 # 1. Remove existing marker artifacts from both containers
