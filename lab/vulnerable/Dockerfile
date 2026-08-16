@@ -7,8 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Cài đặt ép buộc bỏ qua kiểm tra xung đột peer dependencies
-RUN npm install --force --legacy-peer-deps
-
+RUN npm install --force 
 # Sao chép toàn bộ mã nguồn dự án vào container
 COPY . .
 
