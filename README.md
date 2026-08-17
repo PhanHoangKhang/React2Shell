@@ -50,9 +50,33 @@ python src/react2shell_scanner.py lab/patched
 python src/react2shell_scanner.py lab/vulnerable
 ```
 
+### Lab Stop
+```bash
+cd lab
+docker-compose stop
+cd ..
+```
+
 ### Dynamic Exploitation & Validation (PoC)
 To execute the exploit validation tests and verify exfiltration artifacts, please refer to the detailed step-by-step PoC guide:
 
 👉 **[View PoC & Vulnerability Validation Guide (`poc_reference.md`)](./lab/poc/poc_reference.md)**
+
+## 3. Dependencies, Lockfile Format & Version Rules
+
+### Dependency Matrix
+| Target Service | Framework / Package | Installed Version | Lockfile Format |
+| :--- | :--- | :--- | :--- |
+| **Vulnerable Target (`:3001`)** | Next.js | `15.0.0-rc.1` | `package-lock.json` (Lockfile Version 3) |
+| | React / React-DOM | `19.0.0-rc-65a56d0e-20241020` | NPM Registry Release |
+| **Patched Target (`:3002`)** | Next.js | `15.0.3` (Stable) | `package-lock.json` (Lockfile Version 3) |
+| | React / React-DOM | `19.0.0` (Stable) | NPM Registry Release |
+
+### Lockfile Selection & Version-Rule Sources
+- **Selected Lockfile Format:** NPM `package-lock.json` (v3 format). The static scanner prioritizes parsing the resolved dependency tree inside `packages["node_modules/next"]` for accurate detection.
+- **Version-Rule Sources:** Rule definitions for CVE-2025-55182 are derived from official Next.js Security Advisories, marking all Next.js versions `< 15.0.3` (including `15.0.0-rc` builds) as vulnerable to RSC Flight Protocol deserialization.
+
+### PoC Source & Reference Commit
+- **PoC Source:** Derived from public research on React Server Components (RSC) Flight Chunk Deserialization Gadgets.
 
 
