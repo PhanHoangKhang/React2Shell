@@ -30,7 +30,7 @@ This repository provides a reproducible, dual-container Docker environment desig
 ### Installation
 Clone the repository and verify your local environment:
 ```bash
-git clone https://github.com/rmit-nct/React2Shell.git
+git clone https://github.com/PhanHoangKhang/React2Shell.git
 ```
 ### Lab Startup
 Navigate to the lab/ directory and initialize both dual-build containers:
