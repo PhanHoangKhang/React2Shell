@@ -1,4 +1,4 @@
-# Docker Lab & PoC Validation: React2Shell (CVE-2025-55182)
+# Docker Lab & Detection Scanner & PoC Validation: React2Shell (CVE-2025-55182)
 
 > **Disclaimer:** This repository and its PoC artifacts are created strictly for educational, research, and defensive security demonstration purposes within an isolated lab environment. Unsanctioned testing against external systems is strictly prohibited.
 
